@@ -154,52 +154,61 @@
         return;
       }
 
-      try {
-        statusText.innerText = "Extracting streaming link...";
+      statusText.innerText = "Extracting streaming link...";
 
-        // Public high-speed Terabox resolver API endpoint
-        const apiUrl = `https://terabox-api.ytbapi.tools/api?url=${encodeURIComponent(targetUrl)}`;
-        const response = await fetch(apiUrl);
-        const data = await response.json();
+      // Multiple fallback APIs with CORS proxies
+      const resolvers = [
+        `https://api.allorigins.win/raw?url=${encodeURIComponent('https://terabox-api.ytbapi.tools/api?url=' + encodeURIComponent(targetUrl))}`,
+        `https://terabox-dl.qtcloud.workers.dev/api/get-info?url=${encodeURIComponent(targetUrl)}`
+      ];
 
-        if (data && (data.stream_url || data.dlink || (data.list && data.list[0]?.dlink))) {
-          const directStream = data.stream_url || data.dlink || data.list[0].dlink;
-          const fileName = data.title || data.file_name || (data.list && data.list[0]?.server_filename) || "TeraBox Stream";
-          const fileSize = data.size || (data.list && data.list[0]?.size) || "Unknown";
+      let streamFound = false;
 
-          titleElem.innerText = fileName;
-          sizeElem.innerText = `Size: ${formatBytes(fileSize)}`;
-          
-          loadingElem.style.display = "none";
-          metaInfo.style.display = "block";
+      for (const apiUrl of resolvers) {
+        try {
+          const response = await fetch(apiUrl, { method: 'GET' });
+          if (!response.ok) continue;
 
-          // Initialize Artplayer with rotation, speed, & quality UX
-          new Artplayer({
-            container: '#artplayer',
-            url: directStream,
-            title: fileName,
-            autoplay: true,
-            pip: true,
-            autoSize: true,
-            autoOrientation: true,
-            setting: true,
-            playbackRate: true,
-            aspectRatio: true,
-            fullscreen: true,
-            fullscreenWeb: true,
-            playsInline: true,
-            theme: '#3b82f6',
-            icons: {
-              state: '<svg width="60" height="60" viewBox="0 0 24 24" fill="#3b82f6"><path d="M8 5v14l11-7z"/></svg>',
-            }
-          });
+          const data = await response.json();
+          const directStream = data.stream_url || data.dlink || (data.list && data.list[0]?.dlink) || (data.download_link);
 
-        } else {
-          showError("Video stream link generate nahi ho saka. Link expire ho chuka hai ya private hai.");
+          if (directStream) {
+            const fileName = data.title || data.file_name || (data.list && data.list[0]?.server_filename) || "TeraBox Stream";
+            const fileSize = data.size || (data.list && data.list[0]?.size) || "Unknown";
+
+            titleElem.innerText = fileName;
+            sizeElem.innerText = `Size: ${formatBytes(fileSize)}`;
+            
+            loadingElem.style.display = "none";
+            metaInfo.style.display = "block";
+
+            new Artplayer({
+              container: '#artplayer',
+              url: directStream,
+              title: fileName,
+              autoplay: true,
+              pip: true,
+              autoSize: true,
+              autoOrientation: true,
+              setting: true,
+              playbackRate: true,
+              aspectRatio: true,
+              fullscreen: true,
+              fullscreenWeb: true,
+              playsInline: true,
+              theme: '#3b82f6'
+            });
+
+            streamFound = true;
+            break;
+          }
+        } catch (e) {
+          console.warn("Resolver attempt failed:", e);
         }
-      } catch (err) {
-        showError("Network/API error. Kripya thodi der baad dubara try karein.");
-        console.error(err);
+      }
+
+      if (!streamFound) {
+        showError("Video stream link generate nahi ho saka. Link expire ho chuka hai ya private hai.");
       }
     }
 
@@ -222,5 +231,4 @@
     window.onload = resolveAndPlay;
   </script>
 </body>
-      </html>
-      
+</html>
