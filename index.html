@@ -156,10 +156,16 @@
 
       statusText.innerText = "Extracting streaming link...";
 
-      // Multiple fallback APIs with CORS proxies
+      // Clean Share ID nikaalna
+      let cleanUrl = targetUrl;
+      const idMatch = targetUrl.match(/\/s\/([a-zA-Z0-9_-]+)/);
+      const shortId = idMatch ? idMatch[1] : "";
+
+      // Multiple Active TeraBox Resolvers
       const resolvers = [
-        `https://api.allorigins.win/raw?url=${encodeURIComponent('https://terabox-api.ytbapi.tools/api?url=' + encodeURIComponent(targetUrl))}`,
-        `https://terabox-dl.qtcloud.workers.dev/api/get-info?url=${encodeURIComponent(targetUrl)}`
+        `https://terabox-downloader.nocapapi.workers.dev/api?url=${encodeURIComponent(cleanUrl)}`,
+        `https://terabox-api.ytbapi.tools/api?url=${encodeURIComponent(cleanUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent('https://teradownloader.com/api/get-info?url=' + encodeURIComponent(cleanUrl))}`
       ];
 
       let streamFound = false;
@@ -170,12 +176,25 @@
           if (!response.ok) continue;
 
           const data = await response.json();
-          const directStream = data.stream_url || data.dlink || (data.list && data.list[0]?.dlink) || (data.download_link);
+
+          // Har tarah ke JSON key structure ko parse karna
+          let directStream = null;
+          let fileName = "TeraBox Video";
+          let fileSize = "Unknown";
+
+          if (data) {
+            // Stream URL checks
+            directStream = data.stream_url || data.downloadUrl || data.dlink || data.direct_link || 
+                           (data.list && data.list[0]?.dlink) || 
+                           (data.resolutions && (data.resolutions["HD Video"] || data.resolutions["Fast Download"])) ||
+                           (data.download_link);
+
+            // Metadata checks
+            fileName = data.title || data.file_name || (data.list && data.list[0]?.server_filename) || fileName;
+            fileSize = data.size || (data.list && data.list[0]?.size) || fileSize;
+          }
 
           if (directStream) {
-            const fileName = data.title || data.file_name || (data.list && data.list[0]?.server_filename) || "TeraBox Stream";
-            const fileSize = data.size || (data.list && data.list[0]?.size) || "Unknown";
-
             titleElem.innerText = fileName;
             sizeElem.innerText = `Size: ${formatBytes(fileSize)}`;
             
@@ -210,8 +229,7 @@
       if (!streamFound) {
         showError("Video stream link generate nahi ho saka. Link expire ho chuka hai ya private hai.");
       }
-    }
-
+              }
     function showError(msg) {
       loadingElem.style.display = "none";
       errorBox.innerText = msg;
