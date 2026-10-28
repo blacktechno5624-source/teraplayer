@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>TeraBox Player - Online Video Player</title>
+  <script src="https://cdn.jsdelivr.net/npm/artplayer/dist/artplayer.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      background-color: #0b0f19;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+    header {
+      width: 100%;
+      padding: 16px 20px;
+      background: #111827;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #1f2937;
+    }
+    .brand {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #3b82f6;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .player-container {
+      width: 100%;
+      max-width: 900px;
+      margin-top: 15px;
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    #artplayer {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+    }
+    .status-box {
+      width: 100%;
+      max-width: 900px;
+      padding: 20px;
+      background: #111827;
+      margin-top: 15px;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .file-title {
+      font-size: 1rem;
+      font-weight: 600;
+      line-height: 1.4;
+      word-break: break-all;
+    }
+    .meta-tags {
+      display: flex;
+      gap: 12px;
+      font-size: 0.85rem;
+      color: #9ca3af;
+    }
+    .tag {
+      background: #1f2937;
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+    .loader {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      padding: 40px 0;
+    }
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 4px solid #1f2937;
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .error-msg {
+      color: #ef4444;
+      font-size: 0.95rem;
+      text-align: center;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M8 5v14l11-7z"/>
+      </svg>
+      TeraPlayer Online
+    </div>
+  </header>
+
+  <div class="player-container">
+    <div id="artplayer"></div>
+  </div>
+
+  <div class="status-box">
+    <div id="loading" class="loader">
+      <div class="spinner"></div>
+      <p id="status-text">Resolving video stream...</p>
+    </div>
+
+    <div id="error-box" class="error-msg"></div>
+
+    <div id="meta-info" style="display: none;">
+      <h2 id="video-title" class="file-title">Loading title...</h2>
+      <div class="meta-tags">
+        <span id="video-size" class="tag">Size: --</span>
+        <span id="video-quality" class="tag">Quality: Full HD</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetUrl = urlParams.get('url');
+
+    const loadingElem = document.getElementById('loading');
+    const statusText = document.getElementById('status-text');
+    const errorBox = document.getElementById('error-box');
+    const metaInfo = document.getElementById('meta-info');
+    const titleElem = document.getElementById('video-title');
+    const sizeElem = document.getElementById('video-size');
+
+    async function resolveAndPlay() {
+      if (!targetUrl) {
+        showError("Koi TeraBox URL provide nahi kiya gaya.");
+        return;
+      }
+
+      try {
+        statusText.innerText = "Extracting streaming link...";
+
+        // Public high-speed Terabox resolver API endpoint
+        const apiUrl = `https://terabox-api.ytbapi.tools/api?url=${encodeURIComponent(targetUrl)}`;
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        if (data && (data.stream_url || data.dlink || (data.list && data.list[0]?.dlink))) {
+          const directStream = data.stream_url || data.dlink || data.list[0].dlink;
+          const fileName = data.title || data.file_name || (data.list && data.list[0]?.server_filename) || "TeraBox Stream";
+          const fileSize = data.size || (data.list && data.list[0]?.size) || "Unknown";
+
+          titleElem.innerText = fileName;
+          sizeElem.innerText = `Size: ${formatBytes(fileSize)}`;
+          
+          loadingElem.style.display = "none";
+          metaInfo.style.display = "block";
+
+          // Initialize Artplayer with rotation, speed, & quality UX
+          new Artplayer({
+            container: '#artplayer',
+            url: directStream,
+            title: fileName,
+            autoplay: true,
+            pip: true,
+            autoSize: true,
+            autoOrientation: true,
+            setting: true,
+            playbackRate: true,
+            aspectRatio: true,
+            fullscreen: true,
+            fullscreenWeb: true,
+            playsInline: true,
+            theme: '#3b82f6',
+            icons: {
+              state: '<svg width="60" height="60" viewBox="0 0 24 24" fill="#3b82f6"><path d="M8 5v14l11-7z"/></svg>',
+            }
+          });
+
+        } else {
+          showError("Video stream link generate nahi ho saka. Link expire ho chuka hai ya private hai.");
+        }
+      } catch (err) {
+        showError("Network/API error. Kripya thodi der baad dubara try karein.");
+        console.error(err);
+      }
+    }
+
+    function showError(msg) {
+      loadingElem.style.display = "none";
+      errorBox.innerText = msg;
+      errorBox.style.display = "block";
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes || isNaN(bytes)) return bytes;
+      const b = parseInt(bytes, 10);
+      if (b === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(b) / Math.log(k));
+      return parseFloat((b / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    window.onload = resolveAndPlay;
+  </script>
+</body>
+      </html>
+      
